@@ -1,0 +1,12 @@
+Flask-CouchDB
+
+This library helps you use CouchDB with Flask.
+
+On Bitbucket:   http://bitbucket.org/leafstorm/flask-couchdb/
+On PyPI:        http://pypi.python.org/pypi/Flask-CouchDB
+Documentation:  http://packages.python.org/Flask-CouchDB/
+
+To build the docs, have Sphinx installed, change to the docs directory, and
+run "make html".
+
+The tests use nose, so have that installed and run "nosetests" to run them.
