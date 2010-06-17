@@ -10,3 +10,5 @@ To build the docs, have Sphinx installed, change to the docs directory, and
 run "make html".
 
 The tests use nose, so have that installed and run "nosetests" to run them.
+
+Thanks to Armin Ronacher for the logo.
