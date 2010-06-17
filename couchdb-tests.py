@@ -22,11 +22,18 @@ class BlogPost(flaskext.couchdb.Document):
     title = flaskext.couchdb.TextField()
     text = flaskext.couchdb.TextField()
     author = flaskext.couchdb.TextField()
+    tags = flaskext.couchdb.ListField(flaskext.couchdb.TextField())
     created = flaskext.couchdb.DateTimeField(default=datetime.now)
     
     by_author = flaskext.couchdb.ViewField('blog', '''\
     function (doc) {
         emit(doc.author, doc);
+    }''')
+    tagged = flaskext.couchdb.ViewField('blog', '''\
+    function (doc) {
+        doc.tags.forEach(function (tag) {
+            emit(tag, doc);
+        });
     }''')
 
 
@@ -80,7 +87,10 @@ class TestFlaskextCouchDB(object):
     def test_add_document(self):
         manager = flaskext.couchdb.CouchDBManager()
         manager.add_document(BlogPost)
-        assert tuple(manager.all_viewdefs())[0].name == 'by_author'
+        viewdefs = list(manager.all_viewdefs())
+        viewdefs.sort(key=lambda d: d.name)
+        assert viewdefs[0].name == 'by_author'
+        assert viewdefs[1].name == 'tagged'
     
     def test_sync(self):
         manager = flaskext.couchdb.CouchDBManager()
@@ -127,7 +137,7 @@ class TestFlaskextCouchDB(object):
             self.app.preprocess_request()
             for post in SAMPLE_POSTS:
                 post.store()
-            steve_res = BlogPost.by_author()['Steve Person']
+            steve_res = BlogPost.by_author['Steve Person']
             assert all(r.author == 'Steve Person' for r in steve_res)
     
     def test_running_standalone_views(self):

@@ -58,13 +58,13 @@ class CouchDBManager(object):
         
         :param dc: The class to add. It should be a subclass of `Document`.
         """
+        viewdefs = []
         for name in dir(dc):
-            viewdefs = []
             item = getattr(dc, name)
             if isinstance(item, OldViewDefinition):
                 viewdefs.append(item)
-            if viewdefs:
-                self.dc_viewdefs[dc] = viewdefs
+        if viewdefs:
+            self.dc_viewdefs[dc] = viewdefs
     
     def add_viewdef(self, viewdef):
         """
@@ -155,7 +155,6 @@ class CouchDBManager(object):
     
     def request_end(self, response):
         del g.couch
-        print('database closed down')
         return response
 
 
@@ -224,6 +223,7 @@ class ViewDefinition(OldViewDefinition):
         
         :param item: An item, or a slice.
         """
+        return self()[item]
 
 
 # only overridden so it will use our ViewDefinition
