@@ -1,10 +1,14 @@
+# -*- coding: utf-8 -*-
 """
-couchdb-tests.py
-================
+tests/couchdb-tests.py
+======================
 This is a testing file for Flask-CouchDB. It should be run using Nose. It will
 attempt to use the CouchDB server at ``http://localhost:5984/`` and the
 database ``flaskext-test``. You can override these with the environment
 variables `FLASKEXT_COUCHDB_SERVER` and `FLASKEXT_COUCHDB_DATABASE`.
+
+:copyright: 2010 Matthew "LeafStorm" Frazier
+:license:   MIT/X11, see LICENSE for details
 """
 
 import os
