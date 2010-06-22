@@ -2,10 +2,13 @@
 """
 tests/couchdb-tests.py
 ======================
-This is a testing file for Flask-CouchDB. It should be run using Nose. It will
-attempt to use the CouchDB server at ``http://localhost:5984/`` and the
-database ``flaskext-test``. You can override these with the environment
-variables `FLASKEXT_COUCHDB_SERVER` and `FLASKEXT_COUCHDB_DATABASE`.
+This is a testing file for Flask-CouchDB. This covers most of the general
+testing.
+
+It should be run using Nose. It will attempt to use the CouchDB server at
+``http://localhost:5984/`` and the database ``flaskext-test``. You can
+override these with the environment variables `FLASKEXT_COUCHDB_SERVER` and
+`FLASKEXT_COUCHDB_DATABASE`.
 
 :copyright: 2010 Matthew "LeafStorm" Frazier
 :license:   MIT/X11, see LICENSE for details
@@ -29,6 +32,10 @@ class BlogPost(flaskext.couchdb.Document):
     tags = flaskext.couchdb.ListField(flaskext.couchdb.TextField())
     created = flaskext.couchdb.DateTimeField(default=datetime.now)
     
+    all_posts = flaskext.couchdb.ViewField('blog', '''\
+    function (doc) {
+        emit(doc._id, doc);
+    }''')
     by_author = flaskext.couchdb.ViewField('blog', '''\
     function (doc) {
         emit(doc.author, doc);
@@ -52,6 +59,11 @@ SAMPLE_POSTS = [
     BlogPost(title='N1', text='number 1', author='Steve Person', id='1'),
     BlogPost(title='N2', text='number 2', author='Fred Person', id='2'),
     BlogPost(title='N3', text='number 3', author='Steve Person', id='3')
+]
+
+POSTS_FOR_PAGINATION = [
+    BlogPost(title='N%d' % n, text='number %d' % n, author='Foo',
+             id='%04d' % n) for n in range(1, 51)
 ]
 
 
@@ -93,8 +105,9 @@ class TestFlaskextCouchDB(object):
         manager.add_document(BlogPost)
         viewdefs = list(manager.all_viewdefs())
         viewdefs.sort(key=lambda d: d.name)
-        assert viewdefs[0].name == 'by_author'
-        assert viewdefs[1].name == 'tagged'
+        assert viewdefs[0].name == 'all_posts'
+        assert viewdefs[1].name == 'by_author'
+        assert viewdefs[2].name == 'tagged'
     
     def test_sync(self):
         manager = flaskext.couchdb.CouchDBManager()
@@ -188,3 +201,33 @@ class TestFlaskextCouchDB(object):
         with self.app.test_request_context('/'):
             self.app.preprocess_request()
             assert 'synced' not in track
+    
+    def test_paging_all(self):
+        paginate = flaskext.couchdb.paginate
+        manager = flaskext.couchdb.CouchDBManager()
+        manager.add_document(BlogPost)
+        manager.setup(self.app)
+        manager.sync(self.app)
+        with self.app.test_request_context('/'):
+            self.app.preprocess_request()
+            flask.g.couch.update(POSTS_FOR_PAGINATION)
+            
+            page1 = paginate(BlogPost.all_posts(), 5)
+            assert isinstance(page1, flaskext.couchdb.Page)
+            assert len(page1.items) == 5
+            assert isinstance(page1.items[0], BlogPost)
+            assert page1.items[0].id == '0001'
+            assert page1.prev is None
+            assert isinstance(page1.next, basestring)
+            
+            page2 = paginate(BlogPost.all_posts(), 5, page1.next)
+            assert isinstance(page2, flaskext.couchdb.Page)
+            assert len(page2.items) == 5
+            assert isinstance(page2.items[0], BlogPost)
+            assert page2.items[0].id == '0006'
+            assert isinstance(page2.prev, basestring)
+            assert isinstance(page2.prev, basestring)
+            
+    
+    def test_paging_keys(self):
+        pass

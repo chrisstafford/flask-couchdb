@@ -22,7 +22,7 @@ from couchdb.mapping import (Field, TextField, FloatField, IntegerField,
                              LongField, BooleanField, DecimalField, DateField,
                              DateTimeField, TimeField, DictField, ListField,
                              Mapping, DEFAULT)
-from flask import g, current_app, json
+from flask import g, current_app, json, abort
 
 __all__ = ['CouchDBManager', 'ViewDefinition', 'Row', 'paginate']
 __all__.extend(mapping.__all__)
@@ -287,7 +287,7 @@ def paginate(view, count, start=None):
     # first, patch the wrapper
     if isinstance(view, OldViewDefinition):
         view = view()
-    old_wrapper = view.view.wrapper
+    old_wrapper = view.view.wrapper or (lambda r: r)
     view.view.wrapper = Row
     rewrap = lambda r: [old_wrapper(i) for i in r]
     
@@ -305,12 +305,16 @@ def paginate(view, count, start=None):
             return Page(rewrap(results[:-1]), next, None)
     else:
         # subsequent page
-        startkey, startid = json.loads(start)
+        descending = view.options.get('descending', False)
+        try:
+            startkey, startid = json.loads(start)
+        except ValueError:
+            abort(400)
         forwards = list(_clone(view, limit=count + 1, startkey=startkey,
                                startkey_docid=startid))
         backwards = list(_clone(view, limit=count, startkey=startkey,
-                                startkey_docid=startid, descending=True,
-                                offset=1))
+                                startkey_docid=startid, skip=1,
+                                descending=not descending))
         
         # processing "next" link
         if len(forwards) <= count:

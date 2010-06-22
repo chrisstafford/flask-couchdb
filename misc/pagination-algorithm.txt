@@ -1,0 +1,61 @@
+Algorithm description for linked-list pagination in CouchDB
+
+Arguments:
+    View: A view, possibly with some default arguments.
+    Start: The JSON-serialized value for the page's start parameter, or null.
+    Count: The number of items per page.
+Returns:
+    Items: A list of the items that go on this page.
+    Next: The serialized value for the next page's start parameter, or null if
+          there is no next page.
+    Prev: The serialized value for the previous page's start parameter, or
+          null if there is no previous page.
+
+
+If Start is null:
+    -- The first page of results is being requested.
+    Let Results equal the results of the query with limit = Count + 1.
+    -- The "Count + 1" is so we can check if there is a next page without
+    -- running an extra query.
+    If the length of Results is Count or less:
+        -- There is only one page.
+        Return Items = Results, Next = null, Prev = null.
+    Else:
+        -- There is a next page.
+        Let NextStart equal the last item in Results.
+        Let Next equal [NextStart's key, NextStart's id] serialized to JSON.
+        Return Items = All but the last of Results, Next = Next, Prev = null.
+Else:
+    -- A subsequent page of results is being requested.
+    Let [StartKey, StartID] equal Start deserialized.
+    Let ForwardResults equal the results of the query with startkey =
+        StartKey, startkey_docid = StartID, limit = Count + 1.
+    -- Includes the items for this page and the start of the next, if present.
+    Let BackwardResults equal the results of the query with startkey =
+        StartKey, startkey_docid = StartID, limit = Count, descending = true,
+        skip = 1.
+    -- Tells us whether there is a previous page, and where it starts.
+    -- The "skip = 1" prevents the start of this page from appearing in the
+    -- query results, making testing easier.
+    
+    -- Processing "Next" page.
+    If the length of ForwardResults is Count or less:
+        -- There aren't any items after this page.
+        Let Next equal null.
+        Let Items equal ForwardResults.
+    Else:
+        -- There is a next page.
+        Let NextStarts equal the last item in ForwardResults.
+        Let Next equal [NextStart's key, NextStart's id] serialized to JSON.
+        Let Items equal all but the last item of ForwardResults.
+    
+    -- Processing "Previous" page.
+    If the length of BackwardResults is 0:
+        -- There are no items before this page.
+        Let Prev equal null.
+    Else:
+        -- There are items before this page.
+        Let PrevStart equal the last item in BackwardResults.
+        Let Prev equal [PrevStart's key, PrevStart's id] serialized to JSON.
+    
+    Return Items = Items, Next = Next, Prev = Prev.
