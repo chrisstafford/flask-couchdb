@@ -19,7 +19,7 @@ from setuptools import setup
 
 setup(
     name='Flask-CouchDB',
-    version='0.1.1',
+    version='0.2',
     url='http://bitbucket.org/leafstorm/flask-couchdb/',
     license='MIT',
     author='Matthew "LeafStorm" Frazier',
