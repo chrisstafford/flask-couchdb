@@ -28,13 +28,17 @@ app.config.from_object(__name__)
 
 # model
 class Signature(Document):
+    doc_type = 'signature'
+    
     message = TextField()
     author = TextField()
     time = DateTimeField(default=datetime.datetime.now)
     
     all = ViewField('guestbook', '''
         function (doc) {
-            emit(doc.time, doc);
+            if (doc.doc_type == 'signature') {
+                emit(doc.time, doc);
+            };
         }''', descending=True)
 
 

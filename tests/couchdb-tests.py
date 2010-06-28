@@ -26,6 +26,8 @@ DATABASE = os.environ.get('FLASKEXT_COUCHDB_DATABASE', 'flaskext-test')
 
 
 class BlogPost(flaskext.couchdb.Document):
+    doc_type = 'blogpost'
+    
     title = flaskext.couchdb.TextField()
     text = flaskext.couchdb.TextField()
     author = flaskext.couchdb.TextField()
@@ -34,17 +36,23 @@ class BlogPost(flaskext.couchdb.Document):
     
     all_posts = flaskext.couchdb.ViewField('blog', '''\
     function (doc) {
-        emit(doc._id, doc);
+        if (doc.doc_type == 'blogpost') {
+            emit(doc._id, doc);
+        };
     }''')
     by_author = flaskext.couchdb.ViewField('blog', '''\
     function (doc) {
-        emit(doc.author, doc);
+        if (doc.doc_type == 'blogpost') {
+            emit(doc.author, doc);
+        };
     }''')
     tagged = flaskext.couchdb.ViewField('blog', '''\
     function (doc) {
-        doc.tags.forEach(function (tag) {
-            emit(tag, doc);
-        });
+        if (doc.doc_type == 'blogpost') {
+            doc.tags.forEach(function (tag) {
+                emit(tag, doc);
+            });
+        };
     }''')
 
 
@@ -136,6 +144,7 @@ class TestFlaskextCouchDB(object):
             assert isinstance(post, BlogPost)
             assert post.id == 'hello'
             assert post.title == 'Hello'
+            assert post.doc_type == 'blogpost'
     
     def test_loading_nonexistent(self):
         manager = flaskext.couchdb.CouchDBManager()

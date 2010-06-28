@@ -168,8 +168,17 @@ class Document(mapping.Document):
     object in the style of an object-relational mapper.
     
     You populate a class with instances of `Field` for all the attributes you
-    want to use on the class.
+    want to use on the class. In addition, if you set the `doc_type`
+    attribute on the class, every document will have a `doc_type` field
+    automatically attached to it with that value. That way, you can tell
+    different document types apart in views.
     """
+    def __init__(self, *args, **kwargs):
+        mapping.Document.__init__(self, *args, **kwargs)
+        cls = type(self)
+        if hasattr(cls, 'doc_type'):
+            self._data['doc_type'] = cls.doc_type
+    
     @classmethod
     def load(cls, id, db=None):
         """
@@ -178,7 +187,8 @@ class Document(mapping.Document):
         used. 
         
         For compatibility with code used to the parameter ordering used in the
-        original CouchDB, the parameters can be given in reverse order.
+        original CouchDB library, the parameters can be given in reverse
+        order.
         
         :param id: The document ID to load.
         :param db: The database to use. Optional.
@@ -248,9 +258,11 @@ class Page(object):
     def __init__(self, items, next=None, prev=None):
         #: A list of the actual items returned from the view.
         self.items = items
+        
         #: The `start` value for the next page, if there is one. If not, this
         #: is `None`. It is JSON-encoded, but not URL-encoded.
         self.next = next
+        
         #: The `start` value for the previous page, if there is one. If not,
         #: this is `None`.
         self.prev = prev
