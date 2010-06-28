@@ -9,6 +9,36 @@ Flask.
 .. _CouchDB: http://couchdb.apache.org/
 
 
+Installation
+============
+First, you need CouchDB. If you're on Linux, your distribution's package
+manager probably has a CouchDB package to install. (On Debian, Ubuntu, and
+Fedora, the package is simply called `couchdb`. On other distros, search your
+distribution's repositories.) Windows and Mac have some unofficial installers
+available, so check CouchDB: The Definitive Guide (see the `Additional
+Reference`_ section) for details. On any other environment, you will probably
+need to `build from source`_.
+
+Once you have the actual CouchDB database installed, you can install
+Flask-CouchDB. If you have `pip`_ (recommended),
+
+.. code-block:: console
+
+   $ pip install Flask-CouchDB
+
+On the other hand, if you can only use `easy_install`, use
+
+.. code-block:: console
+
+   $ easy_install Flask-CouchDB
+
+Both of these will automatically install the couchdb-python library
+Flask-CouchDB needs to work if the proper version is not already installed.
+
+.. _build from source: http://books.couchdb.org/relax/appendix/installing-from-source
+.. _pip: http://pip.openplans.org/
+
+
 Getting Started
 ===============
 To get started, create an instance of the :class:`CouchDBManager` class. This
@@ -28,8 +58,7 @@ indicates the database to use on the server (for example, ``webapp``).
 
 By default, the database will be checked to see if it exists - and views will
 be synchronized to their design documents - on every request. However, this
-can (and maybe should) be customized - see `Database Sync Behavior
-<syncing>`_ for more details.
+can (and should) be changed - see `Database Sync Behavior`_ for more details.
 
 Since the manager does not actually do anything until it is set up, it is safe
 (and useful) for it to be created in advance, separately from the application
@@ -135,6 +164,8 @@ which can make it easier to work with your data. You create a document class
 in a similar manner to ORMs such as Django, Elixir, and SQLObject. ::
 
     class BlogPost(Document):
+        doc_type = 'blogpost'
+        
         title = TextField()
         content = TextField()
         author = TextField()
@@ -156,6 +187,11 @@ if the document with the given ID could not be found. ::
     if post is None:
         abort(404)
     return render_template(post=post)
+
+If a `doc_type` attribute is set on the class, all documents created with
+that class will have their `doc_type` field set to its value. You can use this
+to tell different document types apart in view functions (see `Adding Views`_
+for examples).
 
 Complex Fields
 --------------
@@ -194,6 +230,8 @@ comments on the post::
     )))
 
 
+.. _Adding Views:
+
 Adding Views
 ------------
 The `ViewField` class can be used to add views to your document classes. You
@@ -203,8 +241,10 @@ will automatically take the name of its attribute)::
 
     tagged = ViewField('blog', '''\
         function (doc) {
-            doc.tags.forEach (tag) {
-                emit(tag, doc);
+            if (doc.doc_type == 'blogpost') {
+                doc.tags.forEach(function (tag) {
+                    emit(tag, doc);
+                });
             };
         }''')
 
@@ -214,27 +254,33 @@ automatically be wrapped in the document class. ::
 
     BlogPost.tagged()           # a row for every tag on every document
     BlogPost.tagged['flask']    # a row for every document tagged 'flask'
-
-.. note::
    
-    If you use `ViewField`, please be aware that every value in the view
-    **must** return a document that matches the document class's schema. But
-    if you want to have some sort of other result from the view, there is
-    nothing stopping you from attaching a plain old `ViewDefinition` to the
-    class, like this::
-    
-        tag_counts = ViewDefinition('blog', 'tag_counts', '''\
-            function (doc) {
+If the value of your view is not a document (for example, in most reduce
+views), you can pass `Row` as the `wrapper`. A `Row` has attributes for the
+`key`, `value`, and `id` of a row. ::
+
+    tag_counts = ViewDefinition('blog', '''\
+        function (doc) {
+            if (doc.doc_type == 'blogpost') {
                 doc.tags.forEach(function (tag) {
                     emit(tag, 1);
                 });
-            }''', '''\
-            function (keys, values, rereduce) {
-                return sum(values);
-            }''', group=True)
+            };
+        }''', '''\
+        function (keys, values, rereduce) {
+            return sum(values);
+        }''', wrapper=Row, group=True)
+
+With that view, for example, you could use::
+
+    # print all tag counts
+    for row in tag_counts():
+        print '%d posts tagged %s' % (row.value, row.key)
     
-    In this case, however, you still have to give a name for the view, as the
-    metaclass only automatically names actual `ViewField` instances.
+    # print a single tag's count
+    row = tag_counts[some_tag].rows[0]
+    print '%d posts tagged %s' % (row.value, row.key)
+
 
 To schedule all of the views on a document class for synchronization, use the
 `CouchDBManager.add_document_class` method. All the views will be added when
@@ -243,7 +289,84 @@ the database syncs. ::
     manager.add_document_class(BlogPost)
 
 
-.. _syncing:
+Pagination
+==========
+In any Web application with large datasets, you are going to want to paginate
+your results. The `paginate` function lets you do this.
+
+The particular style of pagination used is known as linked-list pagination.
+This means that instead of a page number, the page is indicated by a reference
+to a particular item (the first one on the page). The advantages of
+linked-list paging include:
+
+- Much more efficient on CouchDB by a wide margin - numbered paging scales
+  poorly on large datasets
+- The items won't change on the user: if another item is added at the
+  beginning of the dataset, and the user clicks Next, an item from the
+  previous page won't get pushed onto the next one
+
+Unfortunately, there are also drawbacks:
+
+- The only way to navigate through is with next/previous links - you can't
+  "skip ahead" without precomputing the page references
+- The start reference is more obtrusive in a URL than the page number
+
+In this case, however, the efficiency issue is the major deciding factor.
+
+To paginate, you need a `ViewResults` instance, like the one you would get
+from calling or slicing a `ViewDefinition` or `ViewField`. Then, you call
+`paginate` with the view results, the number of items per page, and the
+start value given for that page (if there is one). ::
+
+    page = paginate(BlogPost.tagged[tag], 10, request.args.get('start'))
+
+It will return a `Page` instance. That contains the items, as well as the
+start values of the next and previous pages (if there are any). As noted in
+the above example, the best practice is to put the start reference in the
+query string. You can display the page in the template with something like:
+
+.. code-block:: html+jinja
+   
+   <ul>
+   {% for item in page.items %}
+       display item...
+   {% endfor %}
+   </ul>
+   
+   {% if page.prev %}<a href="{{ url_for('display', start=page.prev) }}">Previous</a>{% endif %}
+   {% if page.next %}<a href="{{ url_for('display', start=page.next) }}">Next</a>{% endif %}
+
+taking advantage of the fact that `url_for` converts unknown parameters into
+query string arguments.
+
+If you **really** need numbered paging using limit/skip in your application,
+it's easy enough to implement. (For example, browsing through the posts in a
+forum thread would get tiresome if you had to click through five next links
+just to reach the last post.) A good implementation of numbered paging is in
+the `Flask-SQLAlchemy`_ extension (specifically, the `BaseQuery.paginate`
+method and `Pagination` object), so you can look there for some ideas as to
+the mechanics. The mechanics of using the limit and skip options are described
+on `the CouchDB wiki`_.
+
+If you choose to go this route, though:
+
+- Only use this for datasets that aren't likely to grow infinitely. For
+  example, posts in a particular forum thread aren't likely to keep on going
+  forever. (Even in a gigantic forum like, say, Ubuntu Forums, you're not
+  going to get more than 5000 posts per thread.) The number of
+  threads in a single board, though, might grow ad infinitum (and threads are
+  better located with searching anyway), so they are probably not the best
+  choice for numbered pages.
+- Use a separate "counting" view with a reduce query to determine the total
+  number of items, instead of fetching the entire result set from your main
+  view. (See the `tag_counts` view in the `Adding Views`_ section for an
+  example of how to do this.)
+
+.. _Flask-SQLAlchemy: http://pypi.python.org/pypi/Flask-SQLAlchemy
+.. _the CouchDB wiki: http://wiki.apache.org/couchdb/HTTP_view_API#Querying_Options
+
+
+.. _Database Sync Behavior:
 
 Database Sync Behavior
 ======================
@@ -301,6 +424,8 @@ View Definition
    :members:
    :inherited-members:
    
+.. autoclass:: Row
+   
 
 Documents
 ---------
@@ -312,6 +437,14 @@ Documents
    :members:
 
 .. autoclass:: Mapping
+   :members:
+
+
+Pagination
+----------
+.. autofunction:: paginate
+
+.. autoclass:: Page
    :members:
 
 
@@ -340,6 +473,8 @@ Field Types
 .. autoclass:: DictField
 
 
+.. _Additional Reference:
+
 Additional Reference
 ====================
 - For actually getting started with CouchDB and finding out if you want to use
@@ -358,3 +493,26 @@ Additional Reference
 .. _CouchDB wiki: http://wiki.apache.org/couchdb/
 .. _couchdb-python: http://code.google.com/p/couchdb-python/
 .. _CouchDB - The Definitive Guide: http://books.couchdb.org/relax/
+
+
+Changelog
+=========
+
+Version 0.2
+-----------
+- Added `paginate` and `Page`.
+- Added `doc_type`.
+
+**Backwards Compatibility:** Nothing introduced in this release breaks
+backwards compatibility in itself. However, if you add a `doc_type` attribute
+to your class and use it in your views, it won't update your existing data to
+match. You will have to add the `doc_type` field to all the documents already
+in your database, either by hand or using a script, so they will still show
+up in your view results.
+
+
+Version 0.1.1
+-------------
+- Fixed a bug preventing synchronization of multiple views from `Document`
+  classes.
+- Removed a leftover print statement in the after-request code.
