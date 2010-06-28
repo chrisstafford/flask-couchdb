@@ -255,16 +255,20 @@ class Page(object):
     This represents a single page of items. They are created by the `paginate`
     function.
     """
+    #: A list of the actual items returned from the view.
+    items = ()
+    
+    #: The `start` value for the next page, if there is one. If not, this
+    #: is `None`. It is JSON-encoded, but not URL-encoded.
+    next = None
+    
+    #: The `start` value for the previous page, if there is one. If not,
+    #: this is `None`.
+    prev = None
+    
     def __init__(self, items, next=None, prev=None):
-        #: A list of the actual items returned from the view.
         self.items = items
-        
-        #: The `start` value for the next page, if there is one. If not, this
-        #: is `None`. It is JSON-encoded, but not URL-encoded.
         self.next = next
-        
-        #: The `start` value for the previous page, if there is one. If not,
-        #: this is `None`.
         self.prev = prev
 
 
