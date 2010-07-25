@@ -34,6 +34,8 @@ setup(
         'Flask',
         'CouchDB>=0.7'
     ],
+    tests_require='nose',
+    test_suite='nose.collector',
     classifiers=[
         'Development Status :: 4 - Beta',
         'Environment :: Web Environment',
