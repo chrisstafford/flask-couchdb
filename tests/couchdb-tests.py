@@ -13,7 +13,7 @@ override these with the environment variables `FLASKEXT_COUCHDB_SERVER` and
 :copyright: 2010 Matthew "LeafStorm" Frazier
 :license:   MIT/X11, see LICENSE for details
 """
-
+from __future__ import with_statement
 import os
 import couchdb
 import flask
