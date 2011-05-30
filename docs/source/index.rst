@@ -283,10 +283,10 @@ With that view, for example, you could use::
 
 
 To schedule all of the views on a document class for synchronization, use the
-`CouchDBManager.add_document_class` method. All the views will be added when
+`CouchDBManager.add_document` method. All the views will be added when
 the database syncs. ::
 
-    manager.add_document_class(BlogPost)
+    manager.add_document(BlogPost)
 
 
 Pagination
