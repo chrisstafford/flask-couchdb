@@ -386,7 +386,7 @@ automatic syncing off.
 
 If you don't want to disable it at the code level, it can be disabled at the
 configuration level. After you have run a single request, or synced manually,
-you can set the `DISABLE_AUTO_SYNCING` config option to `True`. It will
+you can set the `DISABLE_AUTO_SYNC` config option to `True`. It will
 prevent the database from syncing on every request, even if it is enabled in
 the code.
 
