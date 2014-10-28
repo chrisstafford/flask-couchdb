@@ -110,6 +110,8 @@ class CouchDBManager(object):
         server_url = app.config['COUCHDB_SERVER']
         db_name = app.config['COUCHDB_DATABASE']
         server = couchdb.Server(server_url)
+        if 'COUCHDB_USERNAME' in app.config and 'COUCHDB_PASSWORD' in app.config:
+          server.resource.credentials = (app.config['COUCHDB_USERNAME'], app.config['COUCHDB_PASSWORD'])
         return server[db_name]
     
     def sync(self, app):
@@ -128,6 +130,8 @@ class CouchDBManager(object):
         server_url = app.config['COUCHDB_SERVER']
         db_name = app.config['COUCHDB_DATABASE']
         server = couchdb.Server(server_url)
+        if 'COUCHDB_USERNAME' in app.config and 'COUCHDB_PASSWORD' in app.config:
+          server.resource.credentials = (app.config['COUCHDB_USERNAME'], app.config['COUCHDB_PASSWORD'])
         if db_name not in server:
             db = server.create(db_name)
         else:
